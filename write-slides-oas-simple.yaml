@@ -13,19 +13,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [document_id, use_cases]
+              required: [document_id, slides_data_json]
               properties:
                 document_id: {type: string}
-                use_cases: 
-                  type: array
-                  items: 
-                    type: object
-                    properties:
-                      number: {type: integer}
-                      title: {type: string}
-                      description: {type: string}
-                      department: {type: string}
-                      impact: {type: string}
-                      data_sources: {type: string}
+                slides_data_json: {type: string}
       responses:
         200: {description: Success}

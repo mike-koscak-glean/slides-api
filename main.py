@@ -41,23 +41,32 @@ class SlideReadResponse(BaseModel):
     slides: List[Dict[str, Any]]
     empty_cells: Dict[str, Dict[str, Dict[str, str]]]  # Organized object IDs for writing
 
-class UseCase(BaseModel):
-    number: int
-    title: str
-    description: str
-    department: str
-    impact: str
-    data_sources: str
-    weekly_time_saved: Optional[str] = None
+class SlideElement(BaseModel):
+    object_id: str
+    element_type: str
+    content: str
+
+class SlideData(BaseModel):
+    slide_index: int
+    slide_id: str
+    elements: List[SlideElement]
 
 class SlideWriteRequest(BaseModel):
     document_id: str
-    use_cases: List[UseCase]
+    slides_data_json: str
+    
+    def get_slides_data(self) -> List[SlideData]:
+        """Parse the JSON string and return a list of SlideData objects"""
+        try:
+            slides_data = json.loads(self.slides_data_json)
+            return [SlideData(**slide) for slide in slides_data]
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            raise ValueError(f"Invalid slides_data_json format: {str(e)}")
 
 class SlideWriteResponse(BaseModel):
     success: bool
     message: str
-    use_cases_written: int
+    elements_written: int
     document_url: str
 
 def authenticate():
@@ -138,49 +147,10 @@ def extract_slide_content(slide, slide_index):
     return slide_data
 
 def identify_empty_cells(slides_data):
-    """Identify empty table cells organized for writing use cases"""
-    empty_cells = {}
-    
-    # Focus on slides 3-6 (typical use case slides)
-    target_slides = [slide for slide in slides_data['slides'] if slide['slide_index'] in [3, 4, 5, 6]]
-    
-    for slide in target_slides:
-        slide_id = slide['slide_id']
-        empty_elements = [elem for elem in slide['elements'] if elem['content'].strip() == '']
-        
-        if len(empty_elements) >= 4:  # At least one row of table cells
-            # Organize empty cells into table structure
-            # This assumes a standard table layout - adjust based on your template
-            row_cells = {}
-            
-            # Group empty elements by Y position (rows)
-            y_positions = {}
-            for elem in empty_elements:
-                if elem['position']:
-                    y = elem['position']['y']
-                    if y not in y_positions:
-                        y_positions[y] = []
-                    y_positions[y].append(elem)
-            
-            # Sort by Y position and organize into rows
-            sorted_rows = sorted(y_positions.items())
-            for row_idx, (y_pos, row_elements) in enumerate(sorted_rows):
-                if len(row_elements) >= 4:  # Full row (description, department, impact, data_sources)
-                    # Sort by X position
-                    row_elements.sort(key=lambda x: x['position']['x'] if x['position'] else 0)
-                    
-                    row_key = f"row{row_idx + 1}"
-                    row_cells[row_key] = {
-                        'description': row_elements[0]['object_id'],
-                        'department': row_elements[1]['object_id'], 
-                        'impact': row_elements[2]['object_id'],
-                        'data_sources': row_elements[3]['object_id']
-                    }
-            
-            if row_cells:
-                empty_cells[slide_id] = row_cells
-    
-    return empty_cells
+    """Legacy function for backward compatibility with read endpoint"""
+    # This function is no longer used by the write endpoint
+    # but kept for the read endpoint's empty_cells response field
+    return {}
 
 def write_title_description_to_cell(object_id, title, description):
     """Create requests to write title (8pt bold) + description (7pt) to a cell"""
@@ -323,86 +293,41 @@ async def read_slides(request: SlideReadRequest):
 @app.post("/slides/write", response_model=SlideWriteResponse)
 async def write_slides(request: SlideWriteRequest):
     """
-    Write use cases to slide template with proper formatting.
-    Requires document to have empty table template structure.
+    Write content directly to specified object IDs in slides.
+    Accepts pre-processed slide data with object_id to content mapping.
     """
     try:
         credentials = authenticate()
         service = build('slides', 'v1', credentials=credentials)
         
-        # First read the current structure to get object IDs
-        read_request = SlideReadRequest(document_id=request.document_id)
-        slide_data = await read_slides(read_request)
+        # Parse slides data from JSON string
+        try:
+            slides_data = request.get_slides_data()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
-        empty_cells = slide_data.empty_cells
-        if not empty_cells:
+        if not slides_data:
             raise HTTPException(
-                status_code=400, 
-                detail="No empty table structure found in slides. Ensure template has empty table cells."
+                status_code=400,
+                detail="No slides data provided. Ensure slides_data_json contains slide elements with object_id and content."
             )
         
-        # Organize slides by ID
-        slide_ids = list(empty_cells.keys())
         all_requests = []
-        use_case_index = 0
+        elements_written = 0
         
-        for slide_index, slide_id in enumerate(slide_ids):
-            if use_case_index >= len(request.use_cases):
-                break
-                
-            # Determine how many use cases for this slide
-            remaining_use_cases = len(request.use_cases) - use_case_index
-            use_cases_for_slide = min(2, remaining_use_cases) if slide_index < len(slide_ids) - 1 else remaining_use_cases
-            
-            slide_cells = empty_cells[slide_id]
-            rows = [key for key in slide_cells.keys() if key.startswith('row')]
-            
-            for row_index in range(min(use_cases_for_slide, len(rows))):
-                if use_case_index >= len(request.use_cases):
-                    break
-                    
-                use_case = request.use_cases[use_case_index]
-                row_key = rows[row_index]
-                
-                if row_key not in slide_cells:
-                    break
-                    
-                row_cells = slide_cells[row_key]
-                
-                # Description cell (with bold title)
-                title = f"{use_case.number}. {use_case.title}"
-                desc_requests = write_title_description_to_cell(
-                    row_cells['description'],
-                    title,
-                    f" {use_case.description}"
-                )
-                all_requests.extend(desc_requests)
-                
-                # Department cell (8pt)
-                dept_requests = write_text_to_cell(
-                    row_cells['department'],
-                    use_case.department,
-                    font_size=8
-                )
-                all_requests.extend(dept_requests)
-                
-                # Impact cell (7pt)
-                impact_requests = write_text_to_cell(
-                    row_cells['impact'],
-                    use_case.impact,
-                    font_size=7
-                )
-                all_requests.extend(impact_requests)
-                
-                # Data sources cell (8pt)
-                data_requests = write_text_to_cell(
-                    row_cells['data_sources'],
-                    use_case.data_sources,
-                    font_size=8
-                )
-                all_requests.extend(data_requests)
-                
-                use_case_index += 1
+        # Process each slide
+        for slide in slides_data:
+            # Process each element in the slide
+            for element in slide.elements:
+                if element.content.strip():  # Only write non-empty content
+                    # Create request to write content to the specific object_id
+                    content_requests = write_text_to_cell(
+                        element.object_id,
+                        element.content,
+                        font_size=8  # Default font size, could be made configurable
+                    )
+                    all_requests.extend(content_requests)
+                    elements_written += 1
         
         # Execute the requests
         if all_requests:
@@ -415,14 +340,14 @@ async def write_slides(request: SlideWriteRequest):
             
             return SlideWriteResponse(
                 success=True,
-                message=f"Successfully wrote {use_case_index} use cases to slides",
-                use_cases_written=use_case_index,
+                message=f"Successfully wrote content to {elements_written} elements across {len(slides_data)} slides",
+                elements_written=elements_written,
                 document_url=document_url
             )
         else:
             raise HTTPException(
                 status_code=400,
-                detail="No valid table cells found to write use cases"
+                detail="No content to write. Ensure elements have non-empty content."
             )
         
     except HTTPException:
