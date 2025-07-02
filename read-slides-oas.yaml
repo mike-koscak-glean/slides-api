@@ -1,0 +1,208 @@
+openapi: 3.0.3
+info:
+  title: Slides Read API
+  description: API endpoint for reading Google Slides content with formatting details
+  version: 1.0.0
+  contact:
+    name: Internal Slides API
+servers:
+  - url: https://slides-content-api-300643503209.us-central1.run.app
+    description: Production Cloud Run Service
+paths:
+  /slides/read:
+    post:
+      summary: Read slide content and structure
+      description: |
+        Reads a Google Slides presentation and returns all slide content with formatting details.
+        Returns organized object IDs for writing use cases to empty table cells.
+        
+        This endpoint is designed to work with slide templates that have structured table layouts
+        for use case presentations. It identifies empty cells and organizes them by slide and row
+        for systematic content insertion.
+      operationId: readSlides
+      tags:
+        - Slides
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - document_id
+              properties:
+                document_id:
+                  type: string
+                  description: Google Slides document ID (from the URL)
+                  example: "1gJ07qLdyubfQjl-VIqM3tle7g4CxtHsexLvLuvu5u0c"
+            examples:
+              read_slides:
+                summary: Read slides example
+                value:
+                  document_id: "1gJ07qLdyubfQjl-VIqM3tle7g4CxtHsexLvLuvu5u0c"
+      responses:
+        '200':
+          description: Successfully retrieved slide content
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - document_id
+                  - title
+                  - total_slides
+                  - slides
+                  - empty_cells
+                properties:
+                  document_id:
+                    type: string
+                    description: The Google Slides document ID
+                  title:
+                    type: string
+                    description: Title of the presentation
+                  total_slides:
+                    type: integer
+                    description: Total number of slides in presentation
+                  slides:
+                    type: array
+                    description: Array of all slides with their content and structure
+                    items:
+                      type: object
+                      properties:
+                        slide_index:
+                          type: integer
+                          description: 1-based slide number
+                        slide_id:
+                          type: string
+                          description: Google Slides internal slide ID
+                        elements:
+                          type: array
+                          description: All elements on the slide
+                          items:
+                            type: object
+                            properties:
+                              object_id:
+                                type: string
+                                description: Google Slides object ID
+                              element_type:
+                                type: string
+                                enum: [shape, textBox]
+                              content:
+                                type: string
+                                description: Text content of the element
+                              position:
+                                type: object
+                                properties:
+                                  x:
+                                    type: number
+                                  y:
+                                    type: number
+                              size:
+                                type: object
+                                properties:
+                                  width:
+                                    type: number
+                                  height:
+                                    type: number
+                  empty_cells:
+                    type: object
+                    description: |
+                      Organized mapping of empty table cells for writing use cases.
+                      Structure: {slide_id: {row_key: {column_type: object_id}}}
+                      
+                      Column types: description, department, impact, data_sources
+                      Row keys: row1, row2, etc.
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          description:
+                            type: string
+                            description: Object ID for use case description cell
+                          department:
+                            type: string  
+                            description: Object ID for department cell
+                          impact:
+                            type: string
+                            description: Object ID for impact rationale cell
+                          data_sources:
+                            type: string
+                            description: Object ID for data sources cell
+              examples:
+                successful_read:
+                  summary: Successful slide read
+                  value:
+                    document_id: "1gJ07qLdyubfQjl-VIqM3tle7g4CxtHsexLvLuvu5u0c"
+                    title: "Use Case Presentation"
+                    total_slides: 6
+                    slides: [
+                      {
+                        "slide_index": 3,
+                        "slide_id": "g36b961cfd9a_1_420",
+                        "elements": [
+                          {
+                            "object_id": "g36b961cfd9a_1_424",
+                            "element_type": "shape",
+                            "content": "",
+                            "position": {"x": 103623, "y": 1424125},
+                            "size": {"width": 1.2996, "height": 0.2486}
+                          }
+                        ]
+                      }
+                    ]
+                    empty_cells:
+                      "g36b961cfd9a_1_420":
+                        "row1":
+                          description: "g36b961cfd9a_1_424"
+                          department: "g36b961cfd9a_1_425"
+                          impact: "g36b961cfd9a_1_428"
+                          data_sources: "g36b961cfd9a_1_429"
+        '400':
+          description: Invalid request - missing or invalid document ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Invalid document ID format"
+        '403':
+          description: Access denied - service account lacks permission to read the document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Access denied to document"
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Document not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Error reading slides: Connection timeout"
+      security:
+        - ServiceAccount: []
+components:
+  securitySchemes:
+    ServiceAccount:
+      type: http
+      scheme: bearer
+      description: Service account authentication for Google Slides API

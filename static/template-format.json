@@ -1,0 +1,126 @@
+{
+  "template_name": "Use Case Presentation Template",
+  "description": "Standard formatting guidelines for use case slides",
+  "slide_structure": {
+    "typical_slides": "3-6",
+    "use_cases_per_slide": "2 (except last slide may have 1)",
+    "table_layout": {
+      "columns": [
+        {
+          "name": "Use Case Description",
+          "width_percentage": 40,
+          "content_format": {
+            "title": {
+              "font": "Arial",
+              "size": "8pt",
+              "weight": "bold",
+              "format": "{number}. {title}",
+              "example": "8. Automated Meeting Documentation and Follow-up"
+            },
+            "description": {
+              "font": "Arial", 
+              "size": "7pt",
+              "weight": "normal",
+              "follows_title": true,
+              "separator": " ",
+              "max_length": 500
+            }
+          }
+        },
+        {
+          "name": "Department",
+          "width_percentage": 15,
+          "content_format": {
+            "font": "Arial",
+            "size": "8pt",
+            "weight": "normal",
+            "max_length": 50,
+            "examples": ["Sales & Customer Success", "Product & Engineering", "All Departments"]
+          }
+        },
+        {
+          "name": "Impact Rationale", 
+          "width_percentage": 30,
+          "content_format": {
+            "font": "Arial",
+            "size": "7pt",
+            "weight": "normal",
+            "max_length": 300,
+            "focus": "business_impact_and_value"
+          }
+        },
+        {
+          "name": "Data Sources",
+          "width_percentage": 15,
+          "content_format": {
+            "font": "Arial",
+            "size": "8pt", 
+            "weight": "normal",
+            "format": "comma_separated_list",
+            "max_length": 100,
+            "examples": ["Salesforce, Gong, Email", "Confluence, Jira, GitHub"]
+          }
+        }
+      ]
+    }
+  },
+  "content_guidelines": {
+    "use_case_title": {
+      "style": "concise_and_actionable",
+      "length": "5-12 words",
+      "format": "Describes the specific automation or solution",
+      "examples": [
+        "Automated Meeting Documentation and Follow-up",
+        "Competitive Intelligence Automation and Battle Card Maintenance", 
+        "CRM Data Quality and Contact Management"
+      ]
+    },
+    "description": {
+      "structure": "problem_statement + solution",
+      "problem_statement": "Current pain point or manual process",
+      "solution": "How Glean addresses the problem",
+      "tone": "professional_and_specific",
+      "length": "2-3 sentences",
+      "keywords_to_include": ["Glean", "automates", "centralizes", "streamlines"]
+    },
+    "department": {
+      "specificity": "primary_beneficiary",
+      "common_departments": [
+        "Sales & Customer Success",
+        "Customer Support", 
+        "Product & Engineering",
+        "Finance & Business Operations",
+        "All Departments",
+        "Sales",
+        "Marketing"
+      ]
+    },
+    "impact_rationale": {
+      "focus": "quantifiable_business_value",
+      "structure": "outcome + benefit",
+      "elements": ["time_savings", "accuracy_improvement", "process_efficiency", "risk_reduction"],
+      "tone": "results_oriented",
+      "length": "1-2 sentences"
+    },
+    "data_sources": {
+      "format": "system_names_comma_separated",
+      "common_sources": [
+        "Salesforce", "Gong", "Email", "Google Docs", "Slack", 
+        "Confluence", "Jira", "GitHub", "Sharepoint", "Teams",
+        "Oracle", "Netsuite", "Excel", "Wiki", "Apex"
+      ],
+      "typical_count": "3-5 sources"
+    }
+  },
+  "quality_standards": {
+    "consistency": "Use similar sentence structure and terminology across use cases",
+    "specificity": "Avoid generic statements, focus on specific workflows and outcomes",
+    "relevance": "Ensure each use case is relevant to enterprise knowledge work",
+    "actionability": "Each use case should describe a concrete automation or improvement"
+  },
+  "numbering": {
+    "start": "typically_8",
+    "increment": "sequential",
+    "note": "Numbers continue from existing use cases in the presentation"
+  }
+}

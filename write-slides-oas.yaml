@@ -1,0 +1,200 @@
+openapi: 3.0.3
+info:
+  title: Slides Write API
+  description: API endpoint for writing use case content to Google Slides with proper formatting
+  version: 1.0.0
+  contact:
+    name: Internal Slides API
+servers:
+  - url: https://slides-content-api-300643503209.us-central1.run.app
+    description: Production Cloud Run Service
+paths:
+  /slides/write:
+    post:
+      summary: Write use cases to slide template
+      description: |
+        Writes use case content to a Google Slides presentation with proper formatting.
+        Requires the document to have an empty table template structure.
+        
+        This endpoint automatically:
+        - Reads the current slide structure to identify empty table cells
+        - Writes use cases with proper formatting (8pt bold titles, 7pt descriptions)
+        - Distributes use cases across available slides (typically slides 3-6)
+        - Applies template-consistent fonts and styling
+        
+        Use case formatting:
+        - Titles: 8pt Arial Bold (e.g., "8. Use Case Title")
+        - Descriptions: 7pt Arial Regular
+        - Impact text: 7pt Arial Regular  
+        - Department/Data Sources: 8pt Arial Regular
+      operationId: writeSlides
+      tags:
+        - Slides
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - document_id
+                - use_cases
+              properties:
+                document_id:
+                  type: string
+                  description: Google Slides document ID (from the URL)
+                  example: "1gJ07qLdyubfQjl-VIqM3tle7g4CxtHsexLvLuvu5u0c"
+                use_cases:
+                  type: array
+                  description: Array of use cases to write to the slides
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required:
+                      - number
+                      - title
+                      - description
+                      - department
+                      - impact
+                      - data_sources
+                    properties:
+                      number:
+                        type: integer
+                        description: Use case number (for ordering and display)
+                        minimum: 1
+                        example: 8
+                      title:
+                        type: string
+                        description: Concise use case title
+                        maxLength: 100
+                        example: "Automated Meeting Documentation and Follow-up"
+                      description:
+                        type: string
+                        description: Detailed description of the use case problem and solution
+                        maxLength: 500
+                        example: "Sales teams struggle with post-meeting documentation, leading to delayed follow-ups and missed opportunities. Glean automates meeting summaries and action items from call recordings."
+                      department:
+                        type: string
+                        description: Primary department or team that benefits
+                        maxLength: 50
+                        example: "Sales & Customer Success"
+                      impact:
+                        type: string
+                        description: Business impact and rationale for the use case
+                        maxLength: 300
+                        example: "Accelerate sales cycles by eliminating manual documentation delays and ensuring consistent follow-up communication."
+                      data_sources:
+                        type: string
+                        description: Comma-separated list of data sources or systems involved
+                        maxLength: 100
+                        example: "Gong, Salesforce, Email, Google Docs, Slack"
+                      weekly_time_saved:
+                        type: string
+                        description: Optional estimate of time saved per employee per week
+                        maxLength: 20
+                        example: "3-4 hours"
+            examples:
+              write_use_cases:
+                summary: Write use cases example
+                value:
+                  document_id: "1gJ07qLdyubfQjl-VIqM3tle7g4CxtHsexLvLuvu5u0c"
+                  use_cases:
+                    - number: 8
+                      title: "Automated Meeting Documentation and Follow-up"
+                      description: "Sales teams struggle with post-meeting documentation, leading to delayed follow-ups and missed opportunities. Glean automates meeting summaries and action items from call recordings."
+                      department: "Sales & Customer Success"
+                      impact: "Accelerate sales cycles by eliminating manual documentation delays and ensuring consistent follow-up communication."
+                      data_sources: "Gong, Salesforce, Email, Google Docs, Slack"
+                      weekly_time_saved: "3-4 hours"
+                    - number: 9
+                      title: "Competitive Intelligence Automation"
+                      description: "Sales teams manually research competitor information before calls, consuming valuable preparation time. Glean automatically surfaces relevant competitive insights and battle cards."
+                      department: "Sales"
+                      impact: "Improve win rates through better competitive positioning and reduce pre-call preparation time."
+                      data_sources: "Salesforce, Confluence, Market Research, News"
+      responses:
+        '200':
+          description: Successfully wrote use cases to slides
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - message
+                  - use_cases_written
+                  - document_url
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the write operation succeeded
+                  message:
+                    type: string
+                    description: Human-readable success message
+                  use_cases_written:
+                    type: integer
+                    description: Number of use cases successfully written
+                  document_url:
+                    type: string
+                    format: uri
+                    description: Direct URL to view the updated presentation
+              examples:
+                successful_write:
+                  summary: Successful write operation
+                  value:
+                    success: true
+                    message: "Successfully wrote 7 use cases to slides"
+                    use_cases_written: 7
+                    document_url: "https://docs.google.com/presentation/d/1gJ07qLdyubfQjl-VIqM3tle7g4CxtHsexLvLuvu5u0c"
+        '400':
+          description: Invalid request - missing data, invalid format, or no empty template found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    examples:
+                      no_template: "No empty table structure found in slides. Ensure template has empty table cells."
+                      invalid_use_case: "Use case data is invalid or missing required fields"
+                      no_cells: "No valid table cells found to write use cases"
+        '403':
+          description: Access denied - service account lacks permission to edit the document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Access denied to document - ensure service account has edit permissions"
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Document not found"
+        '500':
+          description: Internal server error during write operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Error writing slides: API quota exceeded"
+      security:
+        - ServiceAccount: []
+components:
+  securitySchemes:
+    ServiceAccount:
+      type: http
+      scheme: bearer
+      description: Service account authentication for Google Slides API
