@@ -6,7 +6,7 @@ info:
   contact:
     name: Internal Slides API
 servers:
-  - url: https://slides-content-api-300643503209.us-central1.run.app
+  - url: https://slides-content-api-zymqrul26q-uc.a.run.app
     description: Production Cloud Run Service
 paths:
   /slides/read:

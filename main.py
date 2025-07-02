@@ -9,15 +9,22 @@ from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 import json
 import os
+import logging
+import traceback
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 app = FastAPI(
     title="Slides Content API",
     description="API for reading and writing Google Slides content with formatting details",
     version="1.0.0"
 )
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configuration
 SCOPES = ['https://www.googleapis.com/auth/presentations']
@@ -55,9 +62,21 @@ class SlideWriteResponse(BaseModel):
 
 def authenticate():
     """Authenticate using service account credentials"""
-    credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    return credentials
+    try:
+        logger.info(f"Attempting to load service account from: {SERVICE_ACCOUNT_FILE}")
+        
+        if not os.path.exists(SERVICE_ACCOUNT_FILE):
+            raise FileNotFoundError(f"Service account file not found: {SERVICE_ACCOUNT_FILE}")
+            
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        
+        logger.info("Service account credentials loaded successfully")
+        return credentials
+        
+    except Exception as e:
+        logger.error(f"Authentication failed: {str(e)}")
+        raise
 
 def extract_text_from_element(element):
     """Extract text content from a slide element"""
@@ -249,8 +268,12 @@ async def read_slides(request: SlideReadRequest):
     Returns organized object IDs for writing use cases.
     """
     try:
+        logger.info(f"Reading slides for document: {request.document_id}")
+        
         credentials = authenticate()
         service = build('slides', 'v1', credentials=credentials)
+        
+        logger.info("Google Slides service created successfully")
         
         # Get the presentation
         presentation = service.presentations().get(
@@ -281,7 +304,20 @@ async def read_slides(request: SlideReadRequest):
             empty_cells=empty_cells
         )
         
+    except HttpError as e:
+        logger.error(f"Google API error: {e}")
+        if e.resp.status == 404:
+            raise HTTPException(status_code=404, detail=f"Document not found: {request.document_id}")
+        elif e.resp.status == 403:
+            raise HTTPException(status_code=403, detail=f"Access denied to document: {request.document_id}. Ensure service account has view access.")
+        else:
+            raise HTTPException(status_code=500, detail=f"Google API error: {e}")
+    except FileNotFoundError as e:
+        logger.error(f"Service account file not found: {e}")
+        raise HTTPException(status_code=500, detail="Service account configuration error")
     except Exception as e:
+        logger.error(f"Unexpected error reading slides: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error reading slides: {str(e)}")
 
 @app.post("/slides/write", response_model=SlideWriteResponse)

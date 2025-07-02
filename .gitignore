@@ -1,7 +1,7 @@
-# Google Cloud Service Account Keys
-service-account.json
+# Google Cloud Service Account Keys (commented out for deployment)
+# service-account.json
 *-service-account.json
-*.json
+# *.json
 !static/*.json
 
 # Python
